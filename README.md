@@ -41,36 +41,57 @@ The system is built as a modern, decoupled 4-layer architecture:
 
 ```mermaid
 flowchart TD
-    subgraph RAW["📂 Raw Data"]
-        A1["📋 briefing.csv\nCampaign budgets & dates"]
-        A2["📊 inventory.csv\n350k+ ad events"]
-        A3["🖼️ Creative Assets\n144 PNG images"]
-        A4["🗂️ global_design_data.json\nColors, labels, text"]
+    %% =========================================================================
+    %% Modern High-Contrast Theme Styling
+    %% =========================================================================
+    classDef rawCard fill:#0f172a,stroke:#38bdf8,stroke-width:2px,color:#f8fafc;
+    classDef pipeCard fill:#1e1b4b,stroke:#a855f7,stroke-width:2px,color:#f8fafc;
+    classDef dbCard fill:#022c22,stroke:#10b981,stroke-width:2px,color:#f8fafc;
+    classDef apiCard fill:#451a03,stroke:#f59e0b,stroke-width:2px,color:#f8fafc;
+    classDef uiCard fill:#3b0764,stroke:#ec4899,stroke-width:2px,color:#f8fafc;
+
+    subgraph RAW["📂 1. Multimodal Raw Ingestion"]
+        A1["📋 briefing.csv<br/>Campaign budgets & dates"]
+        A2["📊 campaigns_inventory.csv<br/>350k+ raw ad events"]
+        A3["🖼️ Creative Assets_<br/>144 PNG ad images"]
+        A4["🗂️ global_design_data.json<br/>Colors, labels & text"]
     end
 
-    subgraph PIPELINE["⚙️ ML Pipeline  ·  src/pipeline/run_all.py"]
-        B1["Entity Resolution\nLink game_key → image"]
-        B2["Vision Extraction\nResNet50 + Heuristics"]
-        B3["Feature Engineering\nGroupKFold · PCA · LightGBM"]
+    subgraph PIPELINE["⚙️ 2. ML & Feature Pipeline (src/pipeline/run_all.py)"]
+        B1["🔗 Entity Resolution & Linking<br/>Slugs, Request IDs & MD5 Keys"]
+        B2["👁️ Deep Vision Feature Extraction<br/>ResNet50 + PCA + Color Heuristics"]
+        B3["🧠 Feature Engineering & LightGBM<br/>Campaign-Grouped 5-Fold Cross-Validation"]
     end
 
-    subgraph STORE["🗄️ PostgreSQL Database"]
-        C1["Campaigns · Creatives\nMetrics · Benchmarks"]
+    subgraph STORE["🗄️ 3. PostgreSQL Data Warehouse (adcreative_db)"]
+        C1[("📦 staging schema<br/>5 Raw Audit Tables")]
+        C2[("📊 analytics schema<br/>Curated Dimensions & Facts")]
     end
 
-    subgraph API["🚀 FastAPI  ·  src/api/main.py"]
-        D1["/api/stats\n/api/benchmarks\n/api/predict"]
+    subgraph SERVING["🚀 4. Inference & Serving API (FastAPI)"]
+        D1["⚡ FastAPI REST Backend<br/>/api/stats · /api/benchmarks · /api/predict"]
     end
 
-    subgraph DASH["📱 Dashboard  ·  app/index.html"]
-        E1["Interactive KPI Cards\nCreative Simulator"]
+    subgraph DASH["📱 5. Interactive Client Dashboard (app/index.html)"]
+        E1["🎯 AdCreative Intelligence Dashboard<br/>Live KPI Cards · Model R² Charts · Simulator"]
     end
 
-    A1 & A2 & A3 & A4 --> B1
-    B1 --> B2 --> B3
-    B3 -->|"feature_dataset.parquet\nbenchmark_results.json"| C1
-    C1 --> D1
-    D1 -->|"REST JSON"| E1
+    A1 --> B1
+    A2 --> B1
+    A3 --> B1
+    A4 --> B1
+    B1 --> B2
+    B2 --> B3
+    B3 -->|"Parquet & JSON Cache"| C1
+    C1 -->|"SQL Transforms & Joins"| C2
+    C2 -->|"SQLAlchemy ORM - Port 5432"| D1
+    D1 -->|"REST JSON - Port 8000"| E1
+
+    class A1,A2,A3,A4 rawCard;
+    class B1,B2,B3 pipeCard;
+    class C1,C2 dbCard;
+    class D1 apiCard;
+    class E1 uiCard;
 ```
 
 ### The Flow:
@@ -215,24 +236,40 @@ PGPASSWORD=postgres psql -h localhost -p 5432 -U postgres -d adcreative_db
 The data warehouse uses a clean, two-layer schema design:
 
 ```mermaid
-flowchart LR
-    subgraph STG["📦 staging Schema (Raw Audit)"]
-        S1["raw_inventory\n(350k+ events)"]
-        S2["raw_briefing\n(Campaign metadata)"]
-        S3["raw_design_metadata\n(Colors, labels, sizes)"]
-        S4["raw_creative_assets\n(Image file registry)"]
-        S5["raw_vision_features\n(ResNet50 + visual stats)"]
+flowchart TD
+    %% =========================================================================
+    %% Modern High-Contrast Theme Styling
+    %% =========================================================================
+    classDef stgCard fill:#0f172a,stroke:#38bdf8,stroke-width:2px,color:#f8fafc;
+    classDef anlCard fill:#022c22,stroke:#10b981,stroke-width:2px,color:#f8fafc;
+
+    subgraph STG["📦 staging Schema - Raw Audit Layer"]
+        S1["📋 raw_inventory<br/>422,387 raw ad event logs"]
+        S2["📄 raw_briefing<br/>101 campaign brief records"]
+        S3["🎨 raw_design_metadata<br/>1,001 creative design attributes"]
+        S4["🖼️ raw_creative_assets<br/>144 physical image file registry"]
+        S5["👁️ raw_vision_features<br/>144 ResNet50 PCA & visual stats"]
     end
 
-    subgraph ANL["📊 analytics Schema (Curated Warehouse)"]
-        A1["campaigns\n(Budgets & duration)"]
-        A2["creatives\n(Visual features & slugs)"]
-        A3["creative_metrics\n(Aggregated ER / CTR)"]
-        A4["model_benchmarks\n(R², MAE, MAPE per model)"]
-        A5["feature_importances\n(Top visual vs contextual)"]
+    subgraph ANL["📊 analytics Schema - Curated Warehouse"]
+        A1["🏢 campaigns<br/>100 deduplicated campaign dims"]
+        A2["🎯 creatives<br/>228 master creatives with visual stats"]
+        A3["📈 creative_metrics<br/>1,209 aggregated ER/CTR performance facts"]
+        A4["🏆 model_benchmarks<br/>4 model evaluations - R², MAE, MAPE"]
+        A5["⭐ feature_importances<br/>124 ranked visual & contextual weights"]
     end
 
-    STG -->|"SQL Aggregations & Joins"| ANL
+    S1 -->|"GROUP BY Aggregation"| A3
+    S2 -->|"Filter & Normalize"| A1
+    S2 -->|"Join Campaign Context"| A3
+    S3 -->|"Join Design Data"| A2
+    S4 -->|"Asset Registry Link"| A2
+    S5 -->|"Vision Embeddings Join"| A2
+    A3 -->|"Train & Evaluate"| A4
+    A3 -->|"Feature Extraction"| A5
+
+    class S1,S2,S3,S4,S5 stgCard;
+    class A1,A2,A3,A4,A5 anlCard;
 ```
 
 #### 1. `staging` Schema (Raw, Unfiltered Audit Tables)
