@@ -1,1 +1,1 @@
-"""Test suite for Ad-Challenge pipeline."""
+"""Test suite for AdCreative Intelligence pipeline."""

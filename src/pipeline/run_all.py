@@ -1,4 +1,4 @@
-"""Pipeline orchestrator: the main entry point for the Ad-Challenge ML pipeline.
+"""Pipeline orchestrator: the main entry point for the AdCreative Intelligence ML pipeline.
 
 Replaces the heavy Apache Airflow setup with a lightweight, modular Python runner.
 
@@ -208,7 +208,7 @@ def stage_train_final(feature_df, config: dict):
 def print_summary(results: dict) -> None:
     """Print a clean benchmark results summary to console."""
     print("\n" + "=" * 65)
-    print(" AD CHALLENGE - CREATIVE PERFORMANCE PREDICTION BENCHMARK")
+    print(" ADCREATIVE INTELLIGENCE - PERFORMANCE PREDICTION BENCHMARK")
     print("=" * 65)
     print(f" Target: {results.get('target', 'N/A')}")
     print(f" Dataset: {results.get('dataset_size', 0):,} samples | {results.get('n_campaigns', 0)} campaigns")
@@ -235,7 +235,7 @@ def print_summary(results: dict) -> None:
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Ad-Challenge Multimodal ML Pipeline",
+        description="AdCreative Intelligence Multimodal ML Pipeline",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument(
@@ -266,7 +266,7 @@ def main():
     args = parser.parse_args()
 
     logger.info("\n" + "=" * 50)
-    logger.info("  AD-CHALLENGE ML PIPELINE")
+    logger.info("  ADCREATIVE INTELLIGENCE ML PIPELINE")
     logger.info("=" * 50)
 
     config = load_config(args.config)
@@ -307,6 +307,14 @@ def main():
     if stage in ("benchmark", "all"):
         results = stage_benchmark(feature_df, config, force=force)
         print_summary(results)
+        try:
+            from src.db.load import build_analytics_benchmarks
+            from src.db.session import engine
+            with engine.connect() as conn:
+                build_analytics_benchmarks(conn)
+            logger.info("  Synced benchmark results to PostgreSQL analytics schema.")
+        except Exception as e:
+            logger.debug(f"DB benchmark sync skipped: {e}")
 
     if stage in ("training", "all"):
         stage_train_final(feature_df, config)

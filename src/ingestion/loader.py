@@ -1,4 +1,4 @@
-"""Data loading utilities for Ad-Challenge pipeline.
+"""Data loading utilities for AdCreative Intelligence pipeline.
 
 Responsibilities:
 - Load raw CSV, JSON data files

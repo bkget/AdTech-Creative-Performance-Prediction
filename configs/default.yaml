@@ -1,4 +1,4 @@
-# Ad-Challenge Pipeline Configuration
+# AdCreative Intelligence Pipeline Configuration
 # All pipeline stages read from this single config file.
 
 pipeline:
