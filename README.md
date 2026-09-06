@@ -6,6 +6,16 @@ It transforms raw campaign logs, tabular metadata, and actual image pixels (usin
 
 ---
 
+## 📑 Table of Contents
+1. [The Basics: Understanding Ad Analysis](#1-the-basics-understanding-ad-analysis)
+2. [Overall Architecture Flow](#2-overall-architecture-flow)
+3. [Key Technical Decisions & Framework Choices](#3-key-technical-decisions--framework-choices)
+4. [How to Run the Project (Docker & Local)](#4-how-to-run-the-project)
+5. [🗄️ Database Connection & Schema Reference](#5-database-connection--schema-reference)
+6. [How to Interact with the Project](#6-how-to-interact-with-the-project)
+
+---
+
 ## 1. The Basics: Understanding Ad Analysis
 
 ### The Problem
@@ -94,87 +104,202 @@ Why did we choose these specific tools from the vast sea of available options?
 
 ---
 
+---
+
 ## 4. How to Run the Project
 
-You can run this project completely locally (Option A) or using Docker (Option B).
-
-### Prerequisites
-*   Python 3.11+
-*   *(Option A)* A local PostgreSQL server running on port 5432 with credentials `postgres` / `postgres`.
-*   *(Option B)* Docker Desktop installed and running.
-
-### First: Install Dependencies (For Both Options)
-Open your terminal in the project root and run:
-```bash
-python -m venv venv
-# Windows: venv\Scripts\activate
-# Mac/Linux: source venv/bin/activate
-
-python -m pip install -r requirements.txt
-```
+You can run this project with a single Docker command (Option A, Recommended) or locally with Python (Option B).
 
 ---
 
-### Option A: Running Without Docker (Native Local)
+### Option A: Running With Docker (Recommended — One Command)
 
-**Step 1: Run the ML Pipeline**
-Extract features and train the models.
+No local Python, database, or virtual environment setup is required. Docker automatically boots PostgreSQL, initializes all schemas, loads the dataset and benchmarks, and starts the dashboard.
+
+**Step 1: Start Everything**
 ```bash
+docker compose up -d --build
+```
+
+**Step 2: View the Dashboard & Access Services**
+- 📱 **Interactive Dashboard**: [http://localhost:8000](http://localhost:8000)
+- 🚀 **Interactive API Docs (Swagger)**: [http://localhost:8000/docs](http://localhost:8000/docs)
+- 🗄️ **PostgreSQL Database**: `localhost:5432` | DB: `adcreative_db` | User: `postgres` | Password: `postgres`
+  *(See [Section 5](#5-database-connection--schema-reference) below for complete schema details & SQL inspection queries)*
+
+---
+
+#### Optional: Re-running the ML Pipeline in Docker
+If you wish to re-train the models or re-compute feature extraction from scratch inside Docker:
+
+```bash
+# Force recompute the full pipeline inside Docker
+docker compose run --rm pipeline --force
+
+# Or execute inside the running API container
+docker compose exec api python -m src.pipeline.run_all --force
+```
+
+*To shut everything down:* `docker compose down`
+
+---
+
+### Option B: Running Locally (Native Python)
+
+If you prefer developing directly on your host machine:
+
+**Prerequisites:** Python 3.11+ and PostgreSQL running on `localhost:5432` with credentials `postgres/postgres`.
+
+```bash
+# 1. Create and activate virtual environment
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+python -m pip install -r requirements.txt
+
+# 2. Run the ML Pipeline
 python -m src.pipeline.run_all --force
-```
 
-**Step 2: Initialize Database and Load Data**
-Assuming you have a local Postgres running on `localhost:5432`:
-```bash
-# Create the Ad-DB database
+# 3. Initialize DB and load data
 python scripts/init_db.py
-
-# Load the ML data into the database
 python -m src.db.load
-```
 
-**Step 3: Start the Backend API**
-```bash
+# 4. Start the API & Dashboard server
 python -m uvicorn src.api.main:app --port 8000
 ```
-
-**Step 4: View the Dashboard**
-Keep the terminal from Step 3 running. Open a file explorer, navigate to the `app/` folder, and double click `index.html` to open it in your web browser.
+Open **[http://localhost:8000](http://localhost:8000)** in your browser.
 
 ---
 
-### Option B: Running With Docker (Production-Like)
+---
 
-Docker packages the database and the API into isolated containers so you don't have to install PostgreSQL directly on your machine.
+## 5. Database Connection & Schema Reference
 
-**Step 1: Spin up the Infrastructure**
-```bash
-# This downloads Postgres, builds the FastAPI image, and starts both in the background
-docker-compose up -d --build
-```
+When running with Docker, PostgreSQL is exposed on port `5432` with the database `adcreative_db`.
 
-**Step 2: Run the ML Pipeline (Locally)**
-You still run the heavy ML lifting on your local machine to generate the feature datasets.
-```bash
-python -m src.pipeline.run_all --force
-```
+### A. Connection Credentials
 
-**Step 3: Load Data into the Docker Database**
-Push your generated data into the newly running Docker PostgreSQL container.
-```bash
-python -m src.db.load
-```
-
-**Step 4: View the Dashboard**
-Your API is running inside Docker on port 8000. Open `app/index.html` in your web browser. 
-
-*To shut everything down later:* `docker-compose down`
+| Parameter | Value (Host Access) | Value (Docker Network) |
+| :--- | :--- | :--- |
+| **Host** | `localhost` or `127.0.0.1` | `postgres` (or `adcreative_db`) |
+| **Port** | `5432` | `5432` |
+| **Database** | `adcreative_db` | `adcreative_db` |
+| **Username** | `postgres` | `postgres` |
+| **Password** | `postgres` | `postgres` |
+| **Connection URI** | `postgresql://postgres:postgres@localhost:5432/adcreative_db` | `postgresql://postgres:postgres@postgres:5432/adcreative_db` |
 
 ---
 
-## 5. How to Interact with the Project
+### B. How to Connect
 
-Once the Dashboard (`app/index.html`) is open, here is how you interact with it and understand the results:
+#### Option 1: Direct Terminal Access via Docker (Zero local tools needed)
+```bash
+docker compose exec postgres psql -U postgres -d adcreative_db
+```
+
+#### Option 2: Using Local `psql` Client
+```bash
+PGPASSWORD=postgres psql -h localhost -p 5432 -U postgres -d adcreative_db
+```
+
+#### Option 3: GUI Database Tools (DBeaver, pgAdmin, DataGrip, VS Code Extension)
+- **Host**: `localhost`
+- **Port**: `5432`
+- **Database**: `adcreative_db`
+- **Username**: `postgres`
+- **Password**: `postgres`
+
+---
+
+### C. Database Architecture & Table Reference
+
+The data warehouse uses a clean, two-layer schema design:
+
+```mermaid
+flowchart LR
+    subgraph STG["📦 staging Schema (Raw Audit)"]
+        S1["raw_inventory\n(350k+ events)"]
+        S2["raw_briefing\n(Campaign metadata)"]
+        S3["raw_design_metadata\n(Colors, labels, sizes)"]
+        S4["raw_creative_assets\n(Image file registry)"]
+        S5["raw_vision_features\n(ResNet50 + visual stats)"]
+    end
+
+    subgraph ANL["📊 analytics Schema (Curated Warehouse)"]
+        A1["campaigns\n(Budgets & duration)"]
+        A2["creatives\n(Visual features & slugs)"]
+        A3["creative_metrics\n(Aggregated ER / CTR)"]
+        A4["model_benchmarks\n(R², MAE, MAPE per model)"]
+        A5["feature_importances\n(Top visual vs contextual)"]
+    end
+
+    STG -->|"SQL Aggregations & Joins"| ANL
+```
+
+#### 1. `staging` Schema (Raw, Unfiltered Audit Tables)
+- **`staging.raw_inventory`**: Every raw ad event log (`impression`, `first_dropped`, `click-through-event`) with device, OS, country.
+- **`staging.raw_briefing`**: Campaign budgets, agreed volumes, start/end dates, and objectives.
+- **`staging.raw_design_metadata`**: Extracted global design features (dominant colors, text labels, video metadata).
+- **`staging.raw_creative_assets`**: Physical `.png` asset mapping (`filename`, `request_id`, `creative_slug`).
+- **`staging.raw_vision_features`**: Pre-computed 32-dimensional ResNet50 PCA embeddings and handcrafted visual metrics.
+
+#### 2. `analytics` Schema (Curated Dimensional & Fact Tables)
+- **`analytics.campaigns`**: Cleaned, deduplicated campaign dimensions and normalized financial metrics.
+- **`analytics.creatives`**: Creative master table linking images, aspect ratios, brightness, saturation, and visual entropy.
+- **`analytics.creative_metrics`**: Aggregated performance fact table (impressions, clicks, engagements, ER, CTR) grouped by campaign, creative, and user context.
+- **`analytics.model_benchmarks`**: Cross-validation results across Baseline, Tabular, Vision, and Multimodal models.
+- **`analytics.feature_importances`**: Ranked feature importance categorized into *Visual* vs *Contextual*.
+
+---
+
+### D. Useful SQL Queries to Inspect the Data
+
+Once connected via `psql`:
+
+```sql
+-- 1. List all schemas
+\dn
+
+-- 2. List all tables across staging and analytics
+\dt staging.*
+\dt analytics.*
+
+-- 3. View model benchmark scores (R², MAE, MAPE)
+SELECT model_name, r2, mae, rmse, mape, n_features 
+FROM analytics.model_benchmarks 
+ORDER BY r2 DESC;
+
+-- 4. View top 10 most influential features
+SELECT feature_name, category, importance_score 
+FROM analytics.feature_importances 
+ORDER BY importance_score DESC 
+LIMIT 10;
+
+-- 5. Inspect top performing creatives by engagement rate
+SELECT 
+    c.creative_slug,
+    m.n_impressions,
+    m.n_engagements,
+    ROUND(m.engagement_rate::numeric * 100, 2) AS er_percent,
+    ROUND(m.click_through_rate::numeric * 100, 2) AS ctr_percent,
+    c.brightness_mean,
+    c.saturation_mean
+FROM analytics.creative_metrics m
+JOIN analytics.creatives c ON c.game_key = m.game_key
+WHERE m.n_impressions >= 100
+ORDER BY m.engagement_rate DESC
+LIMIT 10;
+
+-- 6. Check total event counts in staging
+SELECT type, COUNT(*) AS event_count 
+FROM staging.raw_inventory 
+GROUP BY type;
+```
+
+---
+
+## 6. How to Interact with the Project
+
+Once the Dashboard (`http://localhost:8000`) is open, here is how you interact with it and understand the results:
 
 1.  **The Hero KPIs:** Notice the top numbers. The platform successfully linked hundreds of thousands of events to their exact creative image assets.
 2.  **The Benchmark Chart:** This is the core scientific result. Click the "R² Score" button. You will see that the `Tabular` model (context only) performs decently, but the `Multimodal` model (context + image pixels) performs significantly better (a ~19% relative jump). This proves that **visual aesthetics drive engagement**.
@@ -182,3 +307,4 @@ Once the Dashboard (`app/index.html`) is open, here is how you interact with it 
 4.  **The Creative Performance Simulator:** Scroll to the bottom. Change the sliders (e.g., increase Brightness, switch Device to Smartphone, toggle Video on). Watch the Predicted ER and CTR update instantly. **This is hitting the FastAPI backend in real-time**, proving the architecture works end-to-end. 
 
 For static analysis charts (perfect for slide decks), check the `results/charts/` folder after running the pipeline!
+
