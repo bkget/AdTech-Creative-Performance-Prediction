@@ -1,0 +1,65 @@
+# ==============================================================================
+# AdCreative Intelligence - DVC Reproducible ML Pipeline
+# ==============================================================================
+# Usage:
+#   dvc repro                 # Run all pipeline stages or changed stages
+#   dvc metrics show          # View benchmark metrics (R2, MAE, MAPE)
+#   dvc dag                   # Visualize pipeline stage dependency graph
+# ==============================================================================
+
+stages:
+  vision:
+    cmd: python -m src.pipeline.run_all --stage vision --source file --force
+    deps:
+      - src/vision/
+      - data/Creative Assets_
+      - configs/default.yaml
+    params:
+      - configs/default.yaml:
+          - vision
+    outs:
+      - data/processed/vision_embeddings.parquet
+      - data/processed/pca_model.pkl
+
+  features:
+    cmd: python -m src.pipeline.run_all --stage features --source file --force
+    deps:
+      - src/features/
+      - src/ingestion/
+      - data/briefing.csv
+      - data/campaigns_inventory_updated.csv
+      - data/global_design_data.json
+      - data/processed/vision_embeddings.parquet
+      - configs/default.yaml
+    params:
+      - configs/default.yaml:
+          - features
+    outs:
+      - data/processed/feature_dataset.parquet
+
+  benchmark:
+    cmd: python -m src.pipeline.run_all --stage benchmark --force
+    deps:
+      - src/evaluation/
+      - src/models/
+      - data/processed/feature_dataset.parquet
+      - configs/default.yaml
+    params:
+      - configs/default.yaml:
+          - modeling
+          - evaluation
+    outs:
+      - results/feature_importance.json
+    metrics:
+      - results/benchmark_results.json:
+          cache: false
+
+  train:
+    cmd: python -m src.pipeline.run_all --stage training --force
+    deps:
+      - src/models/
+      - data/processed/feature_dataset.parquet
+      - configs/default.yaml
+    outs:
+      - models/multimodal.pkl
+      - models/multimodal_ctr.pkl

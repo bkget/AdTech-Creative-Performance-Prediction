@@ -1,0 +1,4 @@
+outs:
+- md5: 1e58632ba6d05cd6beea21552404e9f3
+  size: 25143
+  path: image_features.json

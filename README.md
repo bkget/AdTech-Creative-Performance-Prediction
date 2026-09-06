@@ -13,6 +13,7 @@ It transforms raw campaign logs, tabular metadata, and actual image pixels (usin
 4. [How to Run the Project (Docker & Local)](#4-how-to-run-the-project)
 5. [🗄️ Database Connection & Schema Reference](#5-database-connection--schema-reference)
 6. [How to Interact with the Project](#6-how-to-interact-with-the-project)
+7. [🔄 Data Version Control (DVC) & Pipeline Lineage](#7-data-version-control-dvc--pipeline-lineage)
 
 ---
 
@@ -344,4 +345,80 @@ Once the Dashboard (`http://localhost:8000`) is open, here is how you interact w
 4.  **The Creative Performance Simulator:** Scroll to the bottom. Change the sliders (e.g., increase Brightness, switch Device to Smartphone, toggle Video on). Watch the Predicted ER and CTR update instantly. **This is hitting the FastAPI backend in real-time**, proving the architecture works end-to-end. 
 
 For static analysis charts (perfect for slide decks), check the `results/charts/` folder after running the pipeline!
+
+---
+
+## 7. Data Version Control (DVC) & Pipeline Lineage
+
+This project implements industry-standard **Data Version Control (DVC)** for data artifact tracking, pipeline stage caching, and experiment reproducibility.
+
+### A. Tracked Datasets & Artifacts
+
+| Artifact | Type | Storage Method | Description |
+| :--- | :--- | :--- | :--- |
+| `data/campaigns_inventory_updated.csv` | Raw Data (100 MB) | DVC Tracked (`.dvc`) | 422k+ raw impression & engagement logs |
+| `data/briefing.csv` | Raw Data (111 KB) | DVC Tracked (`.dvc`) | Campaign briefs, objectives & budgets |
+| `data/global_design_data.json` | Raw Data (4 MB) | DVC Tracked (`.dvc`) | Extracted creative UI & color data |
+| `data/image_features.json` | Raw Data (25 KB) | DVC Tracked (`.dvc`) | Image design label metadata |
+| `data/processed/*.parquet` | Processed Cache | Pipeline Output (`dvc.yaml`) | Vision embeddings & merged feature dataset |
+| `models/*.pkl` | Model Weights | Pipeline Output (`dvc.yaml`) | Trained LightGBM multimodal model |
+
+---
+
+### B. Reproducible Pipeline (`dvc.yaml`)
+
+The entire ML lifecycle is orchestrated via [`dvc.yaml`](file:///home/biruk-getaneh/projects/personal/AdTech-Creative-Performance-Prediction/dvc.yaml) with 4 deterministic stages:
+
+```mermaid
+flowchart LR
+    classDef stageCard fill:#0f172a,stroke:#38bdf8,stroke-width:2px,color:#f8fafc;
+    classDef outCard fill:#022c22,stroke:#10b981,stroke-width:2px,color:#f8fafc;
+
+    V["👁️ stage: vision<br/>Extract ResNet50 & Heuristics"]
+    F["⚙️ stage: features<br/>Merge & Feature Engineering"]
+    B["🏆 stage: benchmark<br/>GroupKFold Model Evaluation"]
+    T["🧠 stage: train<br/>Fit Final Multimodal Model"]
+
+    V --> F --> B
+    F --> T
+
+    class V,F,B,T stageCard;
+```
+
+#### Key DVC Pipeline Commands:
+
+```bash
+# 1. Reproduce entire pipeline (skips unchanged stages automatically via cache)
+dvc repro
+
+# 2. View model evaluation metrics across commits
+dvc metrics show
+
+# 3. View pipeline DAG dependency graph
+dvc dag
+
+# 4. Pull all versioned data from remote storage
+dvc pull
+
+# 5. Push data artifacts to remote storage
+dvc push
+```
+
+---
+
+### C. Configuring a Cloud Storage Remote
+
+To sync large data files to cloud object storage (AWS S3, Google Cloud Storage, Azure Blob, or DAGsHub):
+
+```bash
+# Example: Add an AWS S3 Remote
+dvc remote add -d s3-remote s3://my-adcreative-bucket/dvc-storage
+
+# Example: Add a Google Cloud Storage Remote
+dvc remote add -d gcs-remote gs://my-adcreative-bucket/dvc-storage
+
+# Example: Add Google Drive or Local Remote
+dvc remote add -d local-remote /path/to/shared/storage
+```
+
 
