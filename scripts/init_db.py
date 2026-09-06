@@ -5,9 +5,9 @@ conn = psycopg2.connect(dsn="postgresql://postgres:postgres@localhost:5432/postg
 conn.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
 cursor = conn.cursor()
 try:
-    cursor.execute('CREATE DATABASE "Ad-DB"')
-    print("Created Ad-DB successfully")
+    cursor.execute("CREATE DATABASE adcreative_db")
+    print("Created adcreative_db successfully")
 except Exception as e:
-    print(f"Error or already exists: {e}")
+    print(f"Database adcreative_db status/notice: {e}")
 cursor.close()
 conn.close()
