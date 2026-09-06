@@ -2,16 +2,27 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install system dependencies required for psycopg2
-RUN apt-get update && apt-get install -y libpq-dev gcc && rm -rf /var/lib/apt/lists/*
+# Install system dependencies required for psycopg2 and basic utilities
+RUN apt-get update && apt-get install -y libpq-dev gcc curl && rm -rf /var/lib/apt/lists/*
+
+# Install PyTorch CPU-only wheel first to avoid pulling 3GB+ of Nvidia CUDA/cuDNN packages
+RUN pip install --no-cache-dir --default-timeout=1000 torch torchvision --index-url https://download.pytorch.org/whl/cpu
 
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir --default-timeout=1000 -r requirements.txt
 
-# Copy source code and config
+# Copy application directories and files
 COPY src/ ./src/
 COPY configs/ ./configs/
 COPY results/ ./results/
+COPY models/ ./models/
+COPY app/ ./app/
+COPY scripts/ ./scripts/
 
-# Start the FastAPI application
-CMD ["uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Ensure entrypoint is executable
+RUN chmod +x scripts/docker_entrypoint.sh
+
+EXPOSE 8000
+
+# Default entrypoint runs database loading and launches FastAPI/Dashboard
+ENTRYPOINT ["/bin/bash", "scripts/docker_entrypoint.sh"]

@@ -26,17 +26,14 @@ plugins/
 .vscode/
 .idea/
 
-# Large data files (mounted as volumes instead)
+# Large data files (mounted as volumes via docker-compose)
 data/campaigns_inventory_updated.csv
 data/Creative Assets_/
 data/global_design_data.json
 
-# Docs (not needed in container)
+# Docs and screenshots
 docs/
 screenshots/
-
-# Demo app (runs separately)
-app/
 
 # Virtual environments
 venv/

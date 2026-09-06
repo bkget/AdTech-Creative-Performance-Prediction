@@ -1,19 +1,17 @@
-version: '3.8'
-
 services:
   postgres:
     image: postgres:13
-    container_name: ad_challenge_db
+    container_name: adcreative_db
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: Ad-DB
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-adcreative_db}
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d Ad-DB"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-adcreative_db}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -22,17 +20,49 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.api
-    container_name: ad_challenge_api
+    container_name: adcreative_api
     ports:
-      - "8000:8000"
+      - "${API_PORT:-8000}:8000"
     environment:
-      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/Ad-DB
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-adcreative_db}
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - POSTGRES_DB=${POSTGRES_DB:-adcreative_db}
     depends_on:
       postgres:
         condition: service_healthy
     volumes:
       - ./src:/app/src
+      - ./data:/app/data
       - ./results:/app/results
+      - ./models:/app/models
+      - ./configs:/app/configs
+      - ./app:/app/app
+      - ./scripts:/app/scripts
+
+  pipeline:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    container_name: adcreative_pipeline
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-adcreative_db}
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - POSTGRES_DB=${POSTGRES_DB:-adcreative_db}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./src:/app/src
+      - ./data:/app/data
+      - ./results:/app/results
+      - ./models:/app/models
+      - ./configs:/app/configs
+      - ./app:/app/app
+      - ./scripts:/app/scripts
+    entrypoint: ["python", "-m", "src.pipeline.run_all"]
+    profiles: ["tools"]
 
 volumes:
   postgres_data:
