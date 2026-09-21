@@ -194,7 +194,7 @@ db-reset: ## Hard reset the database volume and recreate it (wipes all data)
 .PHONY: dvc-repro
 dvc-repro: $(VENV)/.installed ## Reproduce the DVC pipeline: vision → features → benchmark → train
 	@echo -e "${YELLOW}Executing DVC pipeline (vision → features → benchmark → train)...${RESET}"
-	$(DVC) repro
+	PATH=$(VENV_BIN):$$PATH $(DVC) repro
 	@echo -e "${GREEN}✓ DVC pipeline reproduction complete.${RESET}"
 
 .PHONY: dvc-metrics
@@ -221,7 +221,7 @@ run-pipeline-docker: ## Run the ML pipeline in a one-off container (no local Pyt
 ## as part of adcreative_end_to_end_pipeline, always inside this same container)
 ## -----------------------------------------------------------------------------
 
-DBT_IN_AIRFLOW = docker exec adcreative_airflow bash -c "export DBT_LOG_PATH=/tmp/dbt/logs DBT_TARGET_PATH=/tmp/dbt/target && cd /opt/airflow/dbt_project && dbt"
+DBT_IN_AIRFLOW = docker exec adcreative_airflow bash -c 'export DBT_LOG_PATH=/tmp/dbt/logs DBT_TARGET_PATH=/tmp/dbt/target && cd /opt/airflow/dbt_project && dbt "$$@"' --
 
 .PHONY: dbt-run
 dbt-run: ## Compile and run all dbt models inside the Airflow container
