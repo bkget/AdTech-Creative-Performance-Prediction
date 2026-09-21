@@ -3,7 +3,6 @@
 /data/briefing.csv
 /data/campaigns_inventory_updated.csv
 /data/global_design_data.json
-/data/image_features.json
 /data/processed/*.parquet
 /data/processed/*.pkl
 /models/*.pkl

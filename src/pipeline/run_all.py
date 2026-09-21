@@ -86,7 +86,7 @@ def stage_ingestion(config: dict, source: str = "db") -> tuple:
             build_linked_dataset,
         )
 
-        briefing_df, inventory_df, design_dict, image_features, images_df = run_ingestion(config)
+        briefing_df, inventory_df, design_dict, images_df = run_ingestion(config)
         logger.info(f"  Raw data loaded in {time.time()-t0:.1f}s")
 
         t0 = time.time()

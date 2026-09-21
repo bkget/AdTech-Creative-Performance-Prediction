@@ -9,7 +9,7 @@ Responsibilities:
 import json
 import logging
 from pathlib import Path
-from typing import Dict, List, Tuple, Any
+from typing import Dict, Tuple, Any
 
 import pandas as pd
 import numpy as np
@@ -123,26 +123,6 @@ def load_global_design(path: str) -> Dict[str, Any]:
     return data
 
 
-def load_image_features(path: str) -> List[Dict]:
-    """Load the pre-extracted image features JSON.
-    
-    Parameters
-    ----------
-    path : str
-        Path to image_features.json
-        
-    Returns
-    -------
-    list
-        List of dicts with image feature records.
-    """
-    logger.info(f"Loading image features from {path}")
-    with open(path, "r", encoding="utf-8") as f:
-        data = json.load(f)
-    logger.info(f"Image features loaded: {len(data)} records")
-    return data
-
-
 def list_creative_images(images_dir: str) -> pd.DataFrame:
     """Scan the Creative Assets directory and return a DataFrame of image metadata.
     
@@ -200,7 +180,7 @@ def list_creative_images(images_dir: str) -> pd.DataFrame:
     return df
 
 
-def run_ingestion(config: dict) -> Tuple[pd.DataFrame, pd.DataFrame, Dict, List, pd.DataFrame]:
+def run_ingestion(config: dict) -> Tuple[pd.DataFrame, pd.DataFrame, Dict, pd.DataFrame]:
     """Run the complete ingestion step.
     
     Parameters
@@ -211,13 +191,12 @@ def run_ingestion(config: dict) -> Tuple[pd.DataFrame, pd.DataFrame, Dict, List,
     Returns
     -------
     tuple
-        (briefing_df, inventory_df, design_dict, image_features_list, images_df)
+        (briefing_df, inventory_df, design_dict, images_df)
     """
     cfg = config["ingestion"]
     briefing_df = load_briefing(cfg["briefing_csv"])
     inventory_df = load_inventory(cfg["inventory_csv"])
     design_dict = load_global_design(cfg["design_json"])
-    image_features = load_image_features(cfg["image_features_json"])
     images_df = list_creative_images(cfg["images_dir"])
     
-    return briefing_df, inventory_df, design_dict, image_features, images_df
+    return briefing_df, inventory_df, design_dict, images_df

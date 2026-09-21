@@ -393,3 +393,23 @@ make dvc-metrics
 # 3. View pipeline status and cached stages
 make dvc-status
 ```
+
+### Restoring / Pulling Data on a New Machine
+
+The datasets under `data/` are not stored in git — only small `.dvc` pointer files are tracked. The actual data lives in a Google Drive remote (`gdrive_storage`) and is fetched on demand with DVC.
+
+```bash
+git clone <repo-url>
+cd AdTech-Creative-Performance-Prediction
+make setup          # creates .venv and installs dependencies, including dvc[gdrive]
+.venv/bin/dvc pull  # downloads the data referenced by the .dvc files into data/
+```
+
+The first `dvc pull` (or `dvc push`) on a new machine opens a browser window asking you to sign in with the Google account that has access to the shared Drive folder and approve access. This is a one-time step — the resulting token is cached locally under `~/.cache/pydrive2fs/`, so later `dvc pull` / `dvc push` calls won't prompt again.
+
+> **Note:** If Google shows *"This app is blocked"* during that first sign-in, it means DVC's shared default OAuth client has been rate-limited by Google across all of its users — not an error in this project. Fix it by registering your own free OAuth client in [Google Cloud Console](https://console.cloud.google.com/) (APIs & Services → Credentials → **Create OAuth client ID** → Desktop app), then point DVC at it locally:
+> ```bash
+> dvc remote modify --local gdrive_storage gdrive_client_id '<your-client-id>'
+> dvc remote modify --local gdrive_storage gdrive_client_secret '<your-client-secret>'
+> ```
+> These are written to `.dvc/config.local`, which is git-ignored and never committed.

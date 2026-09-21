@@ -2,3 +2,5 @@ outs:
 - md5: f43fadcda4ca539beb9340d56b8c6347
   size: 111849
   path: briefing.csv
+  isexec: true
+  hash: md5

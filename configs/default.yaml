@@ -12,7 +12,6 @@ ingestion:
   briefing_csv: "data/briefing.csv"
   inventory_csv: "data/campaigns_inventory_updated.csv"
   design_json: "data/global_design_data.json"
-  image_features_json: "data/image_features.json"
   images_dir: "data/Creative Assets_"
 
 vision:
