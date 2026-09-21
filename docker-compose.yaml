@@ -40,6 +40,74 @@ services:
       - ./app:/app/app
       - ./scripts:/app/scripts
 
+  airflow:
+    build:
+      context: .
+      dockerfile: Dockerfile.airflow
+    container_name: adcreative_airflow
+    environment:
+      AIRFLOW__CORE__EXECUTOR: SequentialExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: sqlite:////opt/airflow/airflow.db
+      AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+      AIRFLOW__CORE__LOAD_DEFAULT_CONNECTIONS: 'false'
+      AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'false'
+      AIRFLOW__CORE__DONOT_PICKLE: 'true'
+      AIRFLOW__WEBSERVER__WORKERS: 1
+      AIRFLOW__SCHEDULER__PARSING_PROCESSES: 1
+      AIRFLOW__SCHEDULER__MIN_FILE_PROCESS_INTERVAL: 30
+      AIRFLOW__SCHEDULER__DAG_DIR_LIST_INTERVAL: 30
+      AIRFLOW__CORE__MAX_ACTIVE_TASKS_PER_DAG: 2
+      AIRFLOW__CORE__MAX_ACTIVE_RUNS_PER_DAG: 1
+      AIRFLOW__WEBSERVER__EXPOSE_CONFIG: 'false'
+      AIRFLOW_WEB_USER: ${AIRFLOW_WEB_USER:-admin}
+      AIRFLOW_WEB_PASSWORD: ${AIRFLOW_WEB_PASSWORD:-admin}
+      AIRFLOW_WEB_EMAIL: ${AIRFLOW_WEB_EMAIL:-admin@adcreative.ai}
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_NAME: ${POSTGRES_DB:-adcreative_db}
+      DB_USER: ${POSTGRES_USER:-postgres}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      DBT_LOG_PATH: /tmp/dbt/logs
+      DBT_TARGET_PATH: /tmp/dbt/target
+      API_HEALTH_URL: http://api:8000/health
+    command: >
+      bash -c "
+      if [ ! -f /opt/airflow/airflow.db ]; then
+        echo 'Initializing Airflow metadata database (first run)...';
+        airflow db migrate &&
+        airflow users create --username $$AIRFLOW_WEB_USER --password $$AIRFLOW_WEB_PASSWORD --firstname AdTech --lastname Admin --role Admin --email $$AIRFLOW_WEB_EMAIL || true;
+        python3 -c \"import sqlite3; con = sqlite3.connect('/opt/airflow/airflow.db'); con.execute('PRAGMA journal_mode=WAL;'); con.close()\" || true;
+      fi;
+      (while true; do airflow webserver --port 8080; sleep 2; done) &
+      (i=0; until airflow dags list 2>/dev/null | grep -q adcreative_end_to_end_pipeline; do sleep 3; i=$$((i+3)); [ $$i -ge 120 ] && break; done;
+      airflow dags unpause adcreative_end_to_end_pipeline || true) &
+      (sleep 5; cd /opt/airflow/dbt_project && dbt docs generate --profiles-dir . --target docker || true; while true; do dbt docs serve --port 8089 --host 0.0.0.0 --profiles-dir . --target docker --no-browser || python3 -m http.server 8089 --directory /tmp/dbt/target --bind 0.0.0.0; sleep 3; done) &
+      exec airflow scheduler"
+    healthcheck:
+      test: ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health')\" || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 25
+      start_period: 10s
+    ports:
+      - "${AIRFLOW_PORT:-8088}:8080"
+      - "${DBT_DOCS_PORT:-8089}:8089"
+    volumes:
+      - airflow_data:/opt/airflow
+      - ./orchestration/airflow_dag:/opt/airflow/dags
+      - ./orchestration/dbt_project:/opt/airflow/dbt_project
+      - ./src:/opt/airflow/src
+      - ./data:/opt/airflow/data
+      - ./results:/opt/airflow/results
+      - ./models:/opt/airflow/models
+      - ./configs:/opt/airflow/configs
+      - ./scripts:/opt/airflow/scripts
+    depends_on:
+      postgres:
+        condition: service_healthy
+      api:
+        condition: service_started
+
   pipeline:
     build:
       context: .
@@ -66,3 +134,4 @@ services:
 
 volumes:
   postgres_data:
+  airflow_data:

@@ -25,7 +25,11 @@ env/
 .coverage
 htmlcov/
 logs/*
+*.ipynb_checkpoints/
+.ipynb_checkpoints/
+notebook/.ipynb_checkpoints/
 notebooks/.ipynb_checkpoints/
+screenshots/
 .DS_Store
 .idea/
 .vscode/

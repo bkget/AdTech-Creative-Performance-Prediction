@@ -1,0 +1,23 @@
+adcreative_db:
+  target: dev
+  outputs:
+    dev:
+      type: postgres
+      host: "{{ env_var('DB_HOST', 'localhost') }}"
+      user: "{{ env_var('DB_USER', 'adtech_user') }}"
+      password: "{{ env_var('DB_PASSWORD', 'adtech_password') }}"
+      port: "{{ env_var('DB_PORT', '5432') | int }}"
+      dbname: "{{ env_var('DB_NAME', 'adcreative_db') }}"
+      schema: analytics
+      threads: 4
+      keepalives_idle: 0
+    docker:
+      type: postgres
+      host: "{{ env_var('DB_HOST', 'adcreative_db') }}"
+      user: "{{ env_var('DB_USER', 'adtech_user') }}"
+      password: "{{ env_var('DB_PASSWORD', 'adtech_password') }}"
+      port: 5432
+      dbname: "{{ env_var('DB_NAME', 'adcreative_db') }}"
+      schema: analytics
+      threads: 4
+      keepalives_idle: 0

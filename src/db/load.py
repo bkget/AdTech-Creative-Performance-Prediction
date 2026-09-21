@@ -405,9 +405,20 @@ def build_analytics_benchmarks(conn):
     logger.info(f"  → analytics.feature_importances: {fi_count} rows.")
 
 
-# ─────────────────────────────────────────────────────────────
-# Entrypoint
-# ─────────────────────────────────────────────────────────────
+def run_staging_only():
+    """Load only staging tables (Phase 1). Used before dbt transformations."""
+    with engine.connect() as conn:
+        init_schemas(conn)
+        logger.info("=" * 60)
+        logger.info("PHASE 1 — Staging raw source data ...")
+        logger.info("=" * 60)
+        load_staging_inventory(conn)
+        load_staging_briefing(conn)
+        load_staging_design(conn)
+        load_staging_creative_assets(conn)
+        load_staging_vision(conn)
+    logger.info("Staging tables load complete.")
+
 
 def run():
     with engine.connect() as conn:

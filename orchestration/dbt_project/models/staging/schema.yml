@@ -1,0 +1,28 @@
+version: 2
+
+sources:
+  - name: staging_raw
+    schema: staging
+    tables:
+      - name: raw_briefing
+        description: "Raw campaign briefs and budget constraints"
+      - name: raw_inventory
+        description: "Raw ad impression, first_dropped, and click events"
+      - name: raw_vision_features
+        description: "Vision embeddings from ResNet50 + PCA and OpenCV heuristics"
+      - name: raw_creative_assets
+        description: "Extracted creative image assets metadata"
+
+models:
+  - name: stg_briefing
+    description: "Cleansed campaign briefing staging model"
+    columns:
+      - name: campaign_id
+        tests:
+          - not_null
+  - name: stg_inventory
+    description: "Cleansed inventory events"
+  - name: stg_vision_features
+    description: "Cleansed visual features"
+  - name: stg_creative_assets
+    description: "Cleansed asset mappings"

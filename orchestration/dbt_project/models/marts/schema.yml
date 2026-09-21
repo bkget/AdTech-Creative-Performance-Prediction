@@ -1,0 +1,64 @@
+version: 2
+
+models:
+  - name: dim_campaigns
+    description: "Curated unique campaign dimensions from briefs"
+    columns:
+      - name: campaign_id
+        description: "Primary key of campaign"
+        tests:
+          - unique
+          - not_null
+      - name: campaign_name
+        description: "Name of the campaign"
+        tests:
+          - not_null
+
+  - name: dim_creatives
+    description: "Curated unique creatives enriched with ResNet50 vision features and color heuristics"
+    columns:
+      - name: game_key
+        description: "Unique slug/request_id identifier for the creative"
+        tests:
+          - unique
+          - not_null
+      - name: creative_slug
+        tests:
+          - not_null
+      - name: aspect_ratio
+        tests:
+          - not_null
+
+  - name: fact_creative_performance
+    description: "Aggregated performance facts per creative and context"
+    columns:
+      - name: id
+        description: "Synthetic identifier"
+        tests:
+          - unique
+          - not_null
+      - name: campaign_id
+        description: "Foreign key referencing dim_campaigns"
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_campaigns')
+              field: campaign_id
+      - name: game_key
+        description: "Foreign key referencing dim_creatives"
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_creatives')
+              field: game_key
+      - name: n_impressions
+        tests:
+          - not_null
+
+  - name: v_campaign_benchmarks
+    description: "Analytical view calculating campaign-level benchmark KPIs"
+    columns:
+      - name: campaign_id
+        tests:
+          - unique
+          - not_null

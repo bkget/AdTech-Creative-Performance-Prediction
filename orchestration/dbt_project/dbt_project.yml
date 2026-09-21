@@ -1,0 +1,28 @@
+name: 'adcreative_transforms'
+version: '1.0.0'
+config-version: 2
+
+profile: 'adcreative_db'
+
+model-paths: ["models"]
+analysis-paths: ["analyses"]
+test-paths: ["tests"]
+seed-paths: ["seeds"]
+macro-paths: ["macros"]
+snapshot-paths: ["snapshots"]
+
+clean-targets:
+  - "target"
+  - "dbt_packages"
+
+log-path: "/tmp/dbt/logs"
+target-path: "/tmp/dbt/target"
+
+models:
+  adcreative_transforms:
+    staging:
+      +schema: staging
+      +materialized: view
+    marts:
+      +schema: analytics
+      +materialized: table
