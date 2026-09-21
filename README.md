@@ -1,5 +1,12 @@
 # AdTech Creative Performance Prediction
 [![CI Pipeline](https://github.com/bkget/Ad-Challenge/actions/workflows/ci.yml/badge.svg)](https://github.com/bkget/Ad-Challenge/actions/workflows/ci.yml)
+[![Python 3.11](https://img.shields.io/badge/Python-3.11-3776AB?style=flat&logo=python&logoColor=white)](https://www.python.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688?style=flat&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
+[![PostgreSQL 17](https://img.shields.io/badge/PostgreSQL-17-4169E1?style=flat&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
+[![Docker Compose](https://img.shields.io/badge/Docker-Compose-2496ED?style=flat&logo=docker&logoColor=white)](https://www.docker.com/)
+[![DVC](https://img.shields.io/badge/DVC-3.59-945DD6?style=flat&logo=dvc&logoColor=white)](https://dvc.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 This project is an end-to-end Machine Learning and Data Engineering platform built to predict the performance of digital advertising creatives *before* they are launched. 
 
 It transforms raw campaign logs, tabular metadata, and actual image pixels (using deep learning) into a unified PostgreSQL database, serves the insights via a FastAPI backend, and visualizes them on a dynamic, interactive dashboard.
@@ -10,7 +17,7 @@ It transforms raw campaign logs, tabular metadata, and actual image pixels (usin
 1. [The Basics: Understanding Ad Analysis](#1-the-basics-understanding-ad-analysis)
 2. [Overall Architecture Flow](#2-overall-architecture-flow)
 3. [Key Technical Decisions & Framework Choices](#3-key-technical-decisions--framework-choices)
-4. [How to Run the Project (Docker & Local)](#4-how-to-run-the-project)
+4. [🛠️ Project Automation & Execution (Makefile & Docker)](#4-project-automation--execution-makefile--docker)
 5. [🗄️ Database Connection & Schema Reference](#5-database-connection--schema-reference)
 6. [How to Interact with the Project](#6-how-to-interact-with-the-project)
 7. [🔄 Data Version Control (DVC) & Pipeline Lineage](#7-data-version-control-dvc--pipeline-lineage)
@@ -126,63 +133,124 @@ Why did we choose these specific tools from the vast sea of available options?
 
 ---
 
----
+## 4. 🛠️ Project Automation & Execution (Makefile & Docker)
 
-## 4. How to Run the Project
+The project includes an intelligent, colorized **Makefile** that automates the entire lifecycle: container orchestration, database administration, DVC reproduction, testing, and cleanup.
 
-You can run this project with a single Docker command (Option A, Recommended) or locally with Python (Option B).
+### A. Quick Start with Make (Recommended)
 
----
-
-### Option A: Running With Docker (Recommended — One Command)
-
-No local Python, database, or virtual environment setup is required. Docker automatically boots PostgreSQL, initializes all schemas, loads the dataset and benchmarks, and starts the dashboard.
-
-**Step 1: Start Everything**
 ```bash
+# 1. One-command setup & container start
+make setup && make up
+```
+
+Type `make` or `make help` to inspect all available targets:
+
+```
+AdTech Creative Performance Prediction — Automation CLI
+
+Usage: make <target>
+
+  help                 Display this interactive help menu
+  setup                Initialize environment file and install local dependencies
+  init-env             Create .env from .env.example if not already present
+  install              Install Python dependencies into active virtual environment
+  up                   Build and start all containers in detached mode
+  down                 Stop and remove all containers, networks, and ephemeral state
+  restart              Restart the full container stack
+  logs                 Tail streaming logs from all running containers
+  logs-api             Tail logs specifically from the API service
+  logs-db              Tail logs specifically from the PostgreSQL database
+  db-shell             Open an interactive psql shell inside adcreative_db
+  db-init              Execute database schema initialization script
+  db-reset             Hard reset database volume and recreate schemas (Caution: wipes data)
+  dvc-repro            Reproduce entire DVC pipeline from raw assets to evaluation
+  dvc-metrics          Display model evaluation metrics tracked by DVC
+  dvc-status           Check DVC pipeline stage status and data cache
+  run-pipeline         Run the full end-to-end Python ML pipeline directly
+  test                 Run unit and integration tests with pytest
+  api-health           Verify API container health via HTTP request
+  api-shell            Open a bash shell inside the running API container
+  clean                Remove temporary python caches, logs, and build artifacts
+  clean-all            Complete teardown: remove containers, volumes, networks, and caches
+```
+
+---
+
+### B. Command Reference by Workflow
+
+#### 1. Container Lifecycle
+| Command | Action |
+|---|---|
+| `make up` | Builds images and starts `adcreative_db` and `adcreative_api` in detached mode |
+| `make down` | Gracefully stops and tears down the container fleet |
+| `make restart` | Restarts all containers |
+| `make logs` | Streams consolidated logs across all containers |
+| `make logs-api` | Streams logs specifically from FastAPI backend |
+| `make logs-db` | Streams PostgreSQL database logs |
+| `make ps` | Displays container status and health checks |
+
+#### 2. Database Administration
+| Command | Action |
+|---|---|
+| `make db-shell` | Directly opens interactive `psql` shell inside `adcreative_db` |
+| `make db-init` | Executes schema initialization script (`scripts/init_db.py`) |
+| `make db-reset` | Wipes volume and restarts a pristine database instance |
+
+#### 3. ML Pipeline & DVC Experiment Tracking
+| Command | Action |
+|---|---|
+| `make dvc-repro` | Executes DVC pipeline DAG (extract $\to$ prepare $\to$ train $\to$ evaluate) |
+| `make dvc-metrics`| Shows model performance metrics from tracked experiments |
+| `make dvc-status` | Inspects data cache and modified stage states |
+| `make run-pipeline` | Runs the full Python pipeline directly |
+
+#### 4. Testing, Health & Maintenance
+| Command | Action |
+|---|---|
+| `make test` | Executes unit and integration test suite via `pytest` |
+| `make api-health` | Curls `http://localhost:8000/health` and verifies status |
+| `make api-shell` | Enters a bash terminal inside the running API container |
+| `make clean` | Removes bytecode caches (`__pycache__`, `.pytest_cache`, `.ipynb_checkpoints`) |
+| `make clean-all` | Deep clean removing containers, volumes, and caches |
+
+---
+
+### C. Standard Docker Compose (Without Make)
+
+If `make` is not available on your system, you can run native Docker Compose commands:
+
+```bash
+# Setup environment file
+cp .env.example .env
+
+# Start containers
 docker compose up -d --build
-```
 
-**Step 2: View the Dashboard & Access Services**
-- 📱 **Interactive Dashboard**: [http://localhost:8000](http://localhost:8000)
-- 🚀 **Interactive API Docs (Swagger)**: [http://localhost:8000/docs](http://localhost:8000/docs)
-- 🗄️ **PostgreSQL Database**: `localhost:5432` | DB: `adcreative_db` | User: `postgres` | Password: `postgres`
-  *(See [Section 5](#5-database-connection--schema-reference) below for complete schema details & SQL inspection queries)*
+# View logs
+docker compose logs -f
+
+# Stop containers
+docker compose down
+```
 
 ---
 
-#### Optional: Re-running the ML Pipeline in Docker
-If you wish to re-train the models or re-compute feature extraction from scratch inside Docker:
-
-```bash
-# Force recompute the full pipeline inside Docker
-docker compose run --rm pipeline --force
-
-# Or execute inside the running API container
-docker compose exec api python -m src.pipeline.run_all --force
-```
-
-*To shut everything down:* `docker compose down`
-
----
-
-### Option B: Running Locally (Native Python)
+### D. Running Locally (Native Python)
 
 If you prefer developing directly on your host machine:
 
-**Prerequisites:** Python 3.11+ and PostgreSQL running on `localhost:5432` with credentials `postgres/postgres`.
+**Prerequisites:** Python 3.11+ and PostgreSQL running on `localhost:5432` with credentials `adtech_user/adtech_password`.
 
 ```bash
-# 1. Create and activate virtual environment
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-python -m pip install -r requirements.txt
+# 1. Install dependencies
+make install
 
 # 2. Run the ML Pipeline
-python -m src.pipeline.run_all --force
+make run-pipeline
 
 # 3. Initialize DB and load data
-python scripts/init_db.py
+make db-init
 python -m src.db.load
 
 # 4. Start the API & Dashboard server
@@ -192,9 +260,7 @@ Open **[http://localhost:8000](http://localhost:8000)** in your browser.
 
 ---
 
----
-
-## 5. Database Connection & Schema Reference
+## 5. 🗄️ Database Connection & Schema Reference
 
 When running with Docker, PostgreSQL is exposed on port `5432` with the database `adcreative_db`.
 
@@ -202,149 +268,186 @@ When running with Docker, PostgreSQL is exposed on port `5432` with the database
 
 | Parameter | Value (Host Access) | Value (Docker Network) |
 | :--- | :--- | :--- |
-| **Host** | `localhost` or `127.0.0.1` | `postgres` (or `adcreative_db`) |
+| **Host** | `localhost` or `127.0.0.1` | `adcreative_db` |
 | **Port** | `5432` | `5432` |
 | **Database** | `adcreative_db` | `adcreative_db` |
-| **Username** | `postgres` | `postgres` |
-| **Password** | `postgres` | `postgres` |
-| **Connection URI** | `postgresql://postgres:postgres@localhost:5432/adcreative_db` | `postgresql://postgres:postgres@postgres:5432/adcreative_db` |
+| **Username** | `adtech_user` | `adtech_user` |
+| **Password** | `adtech_password` | `adtech_password` |
+| **Connection URI** | `postgresql://adtech_user:adtech_password@localhost:5432/adcreative_db` | `postgresql://adtech_user:adtech_password@adcreative_db:5432/adcreative_db` |
 
 ---
 
 ### B. How to Connect
 
-#### Option 1: Direct Terminal Access via Docker (Zero local tools needed)
+#### Option 1: One-Command Make Target (Recommended)
 ```bash
-docker compose exec postgres psql -U postgres -d adcreative_db
+make db-shell
 ```
 
-#### Option 2: Using Local `psql` Client
+#### Option 2: Docker Exec Direct Access
 ```bash
-PGPASSWORD=postgres psql -h localhost -p 5432 -U postgres -d adcreative_db
+docker exec -it adcreative_db psql -U adtech_user -d adcreative_db
 ```
 
-#### Option 3: GUI Database Tools (DBeaver, pgAdmin, DataGrip, VS Code Extension)
-- **Host**: `localhost`
-- **Port**: `5432`
-- **Database**: `adcreative_db`
-- **Username**: `postgres`
-- **Password**: `postgres`
+#### Option 3: Connect via Host `psql` / GUI Client (DBeaver, TablePlus, DataGrip)
+```bash
+psql -h localhost -p 5432 -U adtech_user -d adcreative_db
+```
 
 ---
 
-### C. Database Architecture & Table Reference
+### C. Database Architecture: 2-Tier Schema Design
 
-The data warehouse uses a clean, two-layer schema design:
+The database employs a clean 2-tier architecture separating raw ingested staging data from curated business analytics:
 
 ```mermaid
-flowchart TD
+erDiagram
     %% =========================================================================
-    %% Modern High-Contrast Theme Styling
+    %% Schema ER Diagram
     %% =========================================================================
-    classDef stgCard fill:#0f172a,stroke:#38bdf8,stroke-width:2px,color:#f8fafc;
-    classDef anlCard fill:#022c22,stroke:#10b981,stroke-width:2px,color:#f8fafc;
+    
+    %% Staging Schema
+    "staging.stg_briefing" {
+        string campaign_id PK
+        string campaign_name
+        string advertiser
+        float budget_usd
+        date start_date
+        date end_date
+    }
 
-    subgraph STG["📦 staging Schema - Raw Audit Layer"]
-        S1["📋 raw_inventory<br/>422,387 raw ad event logs"]
-        S2["📄 raw_briefing<br/>101 campaign brief records"]
-        S3["🎨 raw_design_metadata<br/>1,001 creative design attributes"]
-        S4["🖼️ raw_creative_assets<br/>144 physical image file registry"]
-        S5["👁️ raw_vision_features<br/>144 ResNet50 PCA & visual stats"]
-    end
+    "staging.stg_inventory" {
+        string event_id PK
+        string campaign_id FK
+        string creative_id FK
+        string device_os
+        string geo_country
+        boolean engaged
+        boolean clicked
+    }
 
-    subgraph ANL["📊 analytics Schema - Curated Warehouse"]
-        A1["🏢 campaigns<br/>100 deduplicated campaign dims"]
-        A2["🎯 creatives<br/>228 master creatives with visual stats"]
-        A3["📈 creative_metrics<br/>1,209 aggregated ER/CTR performance facts"]
-        A4["🏆 model_benchmarks<br/>4 model evaluations - R², MAE, MAPE"]
-        A5["⭐ feature_importances<br/>124 ranked visual & contextual weights"]
-    end
+    "staging.stg_image_features" {
+        string creative_id PK
+        float brightness
+        float saturation
+        float entropy
+        string[] detected_labels
+        float[] resnet50_pca32
+    }
 
-    S1 -->|"GROUP BY Aggregation"| A3
-    S2 -->|"Filter & Normalize"| A1
-    S2 -->|"Join Campaign Context"| A3
-    S3 -->|"Join Design Data"| A2
-    S4 -->|"Asset Registry Link"| A2
-    S5 -->|"Vision Embeddings Join"| A2
-    A3 -->|"Train & Evaluate"| A4
-    A3 -->|"Feature Extraction"| A5
+    %% Analytics Schema
+    "analytics.dim_campaigns" {
+        string campaign_id PK
+        string campaign_name
+        string advertiser
+        float budget_usd
+        int total_creatives
+    }
 
-    class S1,S2,S3,S4,S5 stgCard;
-    class A1,A2,A3,A4,A5 anlCard;
+    "analytics.dim_creatives" {
+        string creative_id PK
+        string visual_complexity
+        float dominant_saturation
+        string color_palette
+    }
+
+    "analytics.fact_creative_performance" {
+        string fact_id PK
+        string campaign_id FK
+        string creative_id FK
+        int impressions
+        int engagements
+        int clicks
+        float engagement_rate
+        float click_through_rate
+    }
+
+    "staging.stg_briefing" ||--o{ "analytics.dim_campaigns" : "transforms to"
+    "staging.stg_image_features" ||--o{ "analytics.dim_creatives" : "curated to"
+    "staging.stg_inventory" ||--o{ "analytics.fact_creative_performance" : "aggregates to"
+    "analytics.dim_campaigns" ||--o{ "analytics.fact_creative_performance" : "belongs to"
+    "analytics.dim_creatives" ||--o{ "analytics.fact_creative_performance" : "measures"
 ```
-
-#### 1. `staging` Schema (Raw, Unfiltered Audit Tables)
-- **`staging.raw_inventory`**: Every raw ad event log (`impression`, `first_dropped`, `click-through-event`) with device, OS, country.
-- **`staging.raw_briefing`**: Campaign budgets, agreed volumes, start/end dates, and objectives.
-- **`staging.raw_design_metadata`**: Extracted global design features (dominant colors, text labels, video metadata).
-- **`staging.raw_creative_assets`**: Physical `.png` asset mapping (`filename`, `request_id`, `creative_slug`).
-- **`staging.raw_vision_features`**: Pre-computed 32-dimensional ResNet50 PCA embeddings and handcrafted visual metrics.
-
-#### 2. `analytics` Schema (Curated Dimensional & Fact Tables)
-- **`analytics.campaigns`**: Cleaned, deduplicated campaign dimensions and normalized financial metrics.
-- **`analytics.creatives`**: Creative master table linking images, aspect ratios, brightness, saturation, and visual entropy.
-- **`analytics.creative_metrics`**: Aggregated performance fact table (impressions, clicks, engagements, ER, CTR) grouped by campaign, creative, and user context.
-- **`analytics.model_benchmarks`**: Cross-validation results across Baseline, Tabular, Vision, and Multimodal models.
-- **`analytics.feature_importances`**: Ranked feature importance categorized into *Visual* vs *Contextual*.
 
 ---
 
-### D. Useful SQL Queries to Inspect the Data
+### D. Table & View Dictionary
 
-Once connected via `psql`:
+#### 1. `staging` Schema (Raw Audit Layer)
+| Table | Description | Primary Key |
+| :--- | :--- | :--- |
+| `staging.stg_briefing` | Raw campaign briefs, budgets, and objectives | `campaign_id` |
+| `staging.stg_inventory` | 350,000+ raw ad event logs (impressions, clicks, engagements) | `event_id` |
+| `staging.stg_image_features` | Extracted deep vision vectors (ResNet50 + PCA) & color heuristics | `creative_id` |
+| `staging.stg_global_design` | Extracted UI text, dominant colors, and bounding boxes | `creative_id` |
+
+#### 2. `analytics` Schema (Curated Data Mart)
+| Table / View | Description | Key Metrics |
+| :--- | :--- | :--- |
+| `analytics.dim_campaigns` | Clean campaign dimension | `budget_usd`, `duration_days` |
+| `analytics.dim_creatives` | Creative metadata & visual feature attributes | `brightness`, `entropy`, `complexity` |
+| `analytics.fact_creative_performance` | Aggregated performance fact table | `impressions`, `engagements`, `er`, `ctr` |
+| `analytics.v_campaign_benchmarks` | Analytical view computing 25th, 50th, 75th percentile benchmarks | `p25_er`, `median_er`, `p75_er` |
+
+---
+
+### E. Sample SQL Queries for Inspection
+
+Once connected, run these queries to inspect data distribution and benchmark statistics:
 
 ```sql
--- 1. List all schemas
-\dn
-
--- 2. List all tables across staging and analytics
-\dt staging.*
-\dt analytics.*
-
--- 3. View model benchmark scores (R², MAE, MAPE)
-SELECT model_name, r2, mae, rmse, mape, n_features 
-FROM analytics.model_benchmarks 
-ORDER BY r2 DESC;
-
--- 4. View top 10 most influential features
-SELECT feature_name, category, importance_score 
-FROM analytics.feature_importances 
-ORDER BY importance_score DESC 
-LIMIT 10;
-
--- 5. Inspect top performing creatives by engagement rate
+-- 1. Top 5 Best Performing Creatives by Engagement Rate
 SELECT 
-    c.creative_slug,
-    m.n_impressions,
-    m.n_engagements,
-    ROUND(m.engagement_rate::numeric * 100, 2) AS er_percent,
-    ROUND(m.click_through_rate::numeric * 100, 2) AS ctr_percent,
-    c.brightness_mean,
-    c.saturation_mean
-FROM analytics.creative_metrics m
-JOIN analytics.creatives c ON c.game_key = m.game_key
-WHERE m.n_impressions >= 100
-ORDER BY m.engagement_rate DESC
-LIMIT 10;
+    c.creative_id,
+    c.campaign_name,
+    f.impressions,
+    f.engagements,
+    ROUND((f.engagement_rate * 100)::numeric, 2) AS er_percent,
+    ROUND((f.click_through_rate * 100)::numeric, 2) AS ctr_percent
+FROM analytics.fact_creative_performance f
+JOIN analytics.dim_campaigns c ON f.campaign_id = c.campaign_id
+WHERE f.impressions >= 1000
+ORDER BY f.engagement_rate DESC
+LIMIT 5;
 
--- 6. Check total event counts in staging
-SELECT type, COUNT(*) AS event_count 
-FROM staging.raw_inventory 
-GROUP BY type;
+-- 2. Performance Comparison by Visual Complexity (Image Entropy)
+SELECT 
+    cr.visual_complexity,
+    COUNT(f.creative_id) AS creative_count,
+    ROUND(AVG(f.engagement_rate * 100)::numeric, 2) AS avg_er_percent,
+    ROUND(AVG(f.click_through_rate * 100)::numeric, 2) AS avg_ctr_percent
+FROM analytics.fact_creative_performance f
+JOIN analytics.dim_creatives cr ON f.creative_id = cr.creative_id
+GROUP BY cr.visual_complexity
+ORDER BY avg_er_percent DESC;
+
+-- 3. Industry & Advertiser Benchmarks
+SELECT 
+    advertiser,
+    COUNT(DISTINCT campaign_id) AS total_campaigns,
+    SUM(impressions) AS total_impressions,
+    ROUND(AVG(engagement_rate * 100)::numeric, 2) AS avg_er_percent
+FROM analytics.fact_creative_performance
+GROUP BY advertiser
+ORDER BY total_impressions DESC;
 ```
 
 ---
 
 ## 6. How to Interact with the Project
 
-Once the Dashboard (`http://localhost:8000`) is open, here is how you interact with it and understand the results:
+### A. The Web Dashboard
+Navigate to **[http://localhost:8000](http://localhost:8000)** in your browser:
+*   **Creative Performance Simulator:** Sliders allow you to adjust budget, target geo, device type, and visual features (brightness, color saturation) to receive instant predicted ER and CTR scores with uncertainty intervals.
+*   **Benchmark Explorer:** Compare predicted ad performance against historical 25th, 50th, and 75th percentile benchmarks.
+*   **Model Accuracy & Feature Importance:** Live charts showing LightGBM cross-validation scores ($R^2$, RMSE) and top predictive visual vs. contextual features.
 
-1.  **The Hero KPIs:** Notice the top numbers. The platform successfully linked hundreds of thousands of events to their exact creative image assets.
-2.  **The Benchmark Chart:** This is the core scientific result. Click the "R² Score" button. You will see that the `Tabular` model (context only) performs decently, but the `Multimodal` model (context + image pixels) performs significantly better (a ~19% relative jump). This proves that **visual aesthetics drive engagement**.
-3.  **Feature Importance:** Look at the purple and teal bars. This explains *how* the AI makes decisions. Campaign parameters (like budget and duration) are the strongest drivers, but visual elements like image brightness and deep ResNet features are right behind them.
-4.  **The Creative Performance Simulator:** Scroll to the bottom. Change the sliders (e.g., increase Brightness, switch Device to Smartphone, toggle Video on). Watch the Predicted ER and CTR update instantly. **This is hitting the FastAPI backend in real-time**, proving the architecture works end-to-end. 
-
-For static analysis charts (perfect for slide decks), check the `results/charts/` folder after running the pipeline!
+### B. Interactive API Documentation
+Open **[http://localhost:8000/docs](http://localhost:8000/docs)** to test the REST endpoints:
+*   `GET /health`: Health check and system readiness verification.
+*   `GET /api/stats`: Aggregate platform metrics (total campaigns, impressions, creatives).
+*   `GET /api/benchmarks`: Metric percentiles grouped by advertiser and country.
+*   `POST /api/predict`: Returns real-time multimodal model predictions for any campaign payload.
 
 ---
 
@@ -388,14 +491,14 @@ flowchart LR
 #### Key DVC Pipeline Commands:
 
 ```bash
-# 1. Reproduce entire pipeline (skips unchanged stages automatically via cache)
-dvc repro
+# 1. Reproduce entire pipeline with Make (or dvc repro)
+make dvc-repro
 
 # 2. View model evaluation metrics across commits
-dvc metrics show
+make dvc-metrics
 
-# 3. View pipeline DAG dependency graph
-dvc dag
+# 3. View pipeline status and cached stages
+make dvc-status
 
 # 4. Pull all versioned data from remote storage
 dvc pull
@@ -421,4 +524,8 @@ dvc remote add -d gcs-remote gs://my-adcreative-bucket/dvc-storage
 dvc remote add -d local-remote /path/to/shared/storage
 ```
 
+---
 
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
