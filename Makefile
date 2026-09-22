@@ -106,13 +106,13 @@ _wait-ready:
 	@echo -e "${YELLOW}⏳ Waiting for Airflow and dbt docs to come online (this can take a few minutes on a cold start)...${RESET}"
 	@i=0; until curl -sf http://localhost:8088/health >/dev/null 2>&1; do \
 		i=$$((i+1)); \
-		if [ $$i -gt 180 ]; then echo -e "\n${RED}✗ Timed out after 180s waiting for Airflow. Check 'make logs-airflow'.${RESET}"; exit 0; fi; \
+		if [ $$i -gt 420 ]; then echo -e "\n${RED}✗ Timed out after 420s waiting for Airflow. This can happen on a slow first-time cold start (Airflow initializing its metadata DB). Check 'make logs-airflow', or just wait and re-check http://localhost:8088 in your browser.${RESET}"; exit 0; fi; \
 		echo -n "."; sleep 1; \
 	done; \
 	echo -e "\n${GREEN}✓ Airflow is ready at http://localhost:8088${RESET}"
 	@i=0; until curl -sf http://localhost:8089 >/dev/null 2>&1; do \
 		i=$$((i+1)); \
-		if [ $$i -gt 120 ]; then echo -e "\n${RED}✗ Timed out after 120s waiting for dbt docs. Check 'make logs-airflow'.${RESET}"; exit 0; fi; \
+		if [ $$i -gt 240 ]; then echo -e "\n${RED}✗ Timed out after 240s waiting for dbt docs. Check 'make logs-airflow', or just wait and re-check http://localhost:8089 in your browser.${RESET}"; exit 0; fi; \
 		echo -n "."; sleep 1; \
 	done; \
 	echo -e "\n${GREEN}✓ dbt docs are ready at http://localhost:8089${RESET}"
