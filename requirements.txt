@@ -22,6 +22,8 @@ fastparquet>=2023.0
 
 # Data Version Control (DVC)
 dvc[gdrive]>=3.0.0
+pyOpenSSL==24.2.1  # pin required by pydrive2/oauth2client; newer pyOpenSSL breaks gdrive auth with GEN_EMAIL errors
+gdown>=6.4.0  # anonymous public-Drive download used by `make up`/_ensure-data (zero Google-login data pull)
 
 # Visualization
 matplotlib>=3.7.0

@@ -181,7 +181,8 @@ Usage: make <target>
   setup                Initialize .env and install local dependencies (first-time setup)
   init-env             Create .env from .env.example if not already present
   install              Install/update Python dependencies into the virtual environment
-  pull-data            Pull raw source data (CSVs/JSON/images) from DVC if missing locally
+  pull-data            Download raw source data (CSVs/JSON/images) if missing locally (no login required)
+  publish-public-data  (Maintainer) Refresh the public zero-login data zip from local data/ -- run after `dvc push`
   up                   Start all containers in detached mode (pulls data first if missing)
   build                Build or rebuild Docker images without starting containers
   up-build             Force rebuild images, then start containers in detached mode
@@ -397,29 +398,46 @@ make dvc-status
 
 ### Restoring / Pulling Data on a New Machine
 
-Only the raw source data is tracked in the DVC remote (Google Drive): `data/briefing.csv`, `data/campaigns_inventory_updated.csv`, `data/global_design_data.json`, and `data/Creative Assets_`. These are not stored in git — only their small `.dvc` pointer files are — so they're fetched on demand with DVC. Everything else under `data/processed/`, `models/`, and `results/` is a *pipeline output*, deliberately **not** stored remotely: it's cheap to regenerate locally with `make dvc-repro` from the raw data above, so there's no need (or safe way, given DVC's lock-file model) to version large, frequently-changing model artifacts in the same remote.
+Only the raw source data is version-controlled: `data/briefing.csv`, `data/campaigns_inventory_updated.csv`, `data/global_design_data.json`, and `data/Creative Assets_`. Everything else under `data/processed/`, `models/`, and `results/` is a *pipeline output*, deliberately **not** stored remotely: it's cheap to regenerate locally with `make dvc-repro` from the raw data above, so there's no need (or safe way, given DVC's lock-file model) to version large, frequently-changing model artifacts in the same remote.
 
-**You normally don't need to do anything by hand.** `make up` automatically checks whether the raw data is present and pulls it first if it's missing, before starting any containers:
+**You don't need to do anything by hand, and you never need a Google account.** `make up` automatically checks whether the raw data is present and downloads it first if it's missing, before starting any containers:
 
 ```bash
 git clone <repo-url>
 cd AdTech-Creative-Performance-Prediction
-make up   # pulls raw data from DVC if missing, then starts the full stack
+make up   # downloads raw data if missing, then starts the full stack
 ```
 
-If you just want the data without starting containers, `make pull-data` does the same check-and-pull on its own.
+If you just want the data without starting containers, `make pull-data` does the same check-and-download on its own.
 
-The first pull on a new machine opens a browser window asking you to sign in with the Google account that has access to the shared Drive folder and approve access. This is a one-time step — the resulting token is cached locally under `~/.cache/pydrive2fs/`, so later pulls won't prompt again.
+This works by downloading a zip of the four raw items from a public, read-only, link-shared Google Drive file (via `gdown`) -- there is no sign-in step, no OAuth prompt, and no Google account requirement of any kind. The zip is extracted straight into `data/`, then removed.
 
-> **Important:** Never run a bare `dvc pull` or `dvc pull --force` with no arguments in this repo. Because `dvc.yaml` declares pipeline outputs (`data/processed/*.parquet`, `models/*.pkl`, etc.) without necessarily having a matching `dvc.lock` yet, an unscoped `dvc pull` will try to reconcile those paths too — and `--force` will delete any local copies it finds without being able to restore them, since they were never pushed to the remote. Always use the scoped form that only touches the four raw-data targets:
+The raw data is actually kept in **two independent places**, and it's important to know which one you're touching:
+
+1. **The public download** (`gdown` + the file ID in `PUBLIC_DATA_FILE_ID` in the Makefile) -- what every `make up` / `make pull-data` uses. Read-only, anyone-with-the-link, no auth.
+2. **The private DVC remote** (Google Drive, via `dvc`) -- the maintainer's own authenticated copy, still used for `dvc push`/`dvc pull` if you prefer DVC's tooling directly, or want a versioned backup.
+
+These two copies do **not** sync automatically. If you (as a maintainer) change the raw source data, update **both**:
+
+```bash
+# 1. Push the new raw data to the private DVC remote (requires your own Google auth -- see below)
+.venv/bin/dvc push "data/briefing.csv.dvc" "data/campaigns_inventory_updated.csv.dvc" "data/global_design_data.json.dvc" "data/Creative Assets_.dvc"
+
+# 2. Refresh the public zip in place (same file ID/link -- nothing else needs updating)
+make publish-public-data
+```
+
+`make publish-public-data` re-uses whatever Google account you've already authenticated `dvc push` with, so run it only after a successful `dvc push`. It replaces the public file's contents in place via the Drive API, so the link `make up` downloads from never changes.
+
+> **Important:** Never run a bare `dvc pull` or `dvc pull --force` with no arguments in this repo. Because `dvc.yaml` declares pipeline outputs (`data/processed/*.parquet`, `models/*.pkl`, etc.) without necessarily having a matching `dvc.lock` yet, an unscoped `dvc pull` will try to reconcile those paths too -- and `--force` will delete any local copies it finds without being able to restore them, since they were never pushed to the remote. Always use the scoped form that only touches the four raw-data targets:
 > ```bash
 > .venv/bin/dvc pull "data/briefing.csv.dvc" "data/campaigns_inventory_updated.csv.dvc" "data/global_design_data.json.dvc" "data/Creative Assets_.dvc"
 > ```
-> (`make pull-data` / `make up` already do this safely for you — this is only relevant if you're calling `dvc` directly.) The same applies to `dvc push`: only push these four targets, never a bare `dvc push`, so pipeline outputs never get uploaded by accident.
+> The same applies to `dvc push`: only push these four targets, never a bare `dvc push`, so pipeline outputs never get uploaded by accident.
 
-> **Note:** If Google shows *"This app is blocked"* during that first sign-in, it means DVC's shared default OAuth client has been rate-limited by Google across all of its users — not an error in this project. Fix it by registering your own free OAuth client in [Google Cloud Console](https://console.cloud.google.com/) (APIs & Services → Credentials → **Create OAuth client ID** → Desktop app), then point DVC at it locally:
+> **Note (maintainers only):** If Google shows *"This app is blocked"* during `dvc push`/`dvc pull`, it means DVC's shared default OAuth client has been rate-limited by Google across all of its users -- not an error in this project. Fix it by registering your own free OAuth client in [Google Cloud Console](https://console.cloud.google.com/) (APIs & Services -> Credentials -> **Create OAuth client ID** -> Desktop app), then point DVC at it locally:
 > ```bash
 > dvc remote modify --local gdrive_storage gdrive_client_id '<your-client-id>'
 > dvc remote modify --local gdrive_storage gdrive_client_secret '<your-client-secret>'
 > ```
-> These are written to `.dvc/config.local`, which is git-ignored and never committed.
+> These are written to `.dvc/config.local`, which is git-ignored and never committed. Regular contributors who only run `make up`/`make pull-data` never hit this -- it only affects direct `dvc push`/`dvc pull` usage.

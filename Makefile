@@ -20,6 +20,13 @@ PYTHON := $(VENV_BIN)/python
 PIP := $(VENV_BIN)/pip
 PYTEST := $(VENV_BIN)/pytest
 DVC := $(VENV_BIN)/dvc
+GDOWN := $(VENV_BIN)/gdown
+
+# Public read-only Google Drive file (zip of the 4 raw data items below) used
+# for zero-login automatic data restore on `make up` / `make pull-data`.
+# Anyone-with-the-link, read-only. Refresh its contents (same file ID) via
+# `make publish-public-data` whenever the raw source data changes.
+PUBLIC_DATA_FILE_ID := 1-InNX4PmoM9gRp-y-89u23d-WAz6MOIz
 
 # Ensure .env exists before anything (incl. variable parsing below) reads it
 ifeq ($(wildcard .env),)
@@ -129,20 +136,33 @@ _ensure-data: $(VENV)/.installed
 		if [ -z "$$(find "data/Creative Assets_" -maxdepth 1 -type f -print -quit 2>/dev/null)" ]; then need_pull=1; fi; \
 	fi; \
 	if [ "$$need_pull" = "1" ]; then \
-		echo -e "${YELLOW}ℹ Raw source data not found locally — pulling from the DVC remote (Google Drive)...${RESET}"; \
-		echo -e "${YELLOW}  First time on this machine? This opens a browser for a one-time Google sign-in.${RESET}"; \
-		$(DVC) pull "data/briefing.csv.dvc" "data/campaigns_inventory_updated.csv.dvc" "data/global_design_data.json.dvc" "data/Creative Assets_.dvc"; \
-		if [ $$? -ne 0 ]; then \
-			echo -e "${RED}✗ Failed to pull source data from DVC. See README > Restoring/Pulling Data on a New Machine.${RESET}"; \
+		echo -e "${YELLOW}ℹ Raw source data not found locally — downloading (no Google sign-in required)...${RESET}"; \
+		tmp_zip=$$(mktemp /tmp/adcreative_raw_data.XXXXXX.zip); \
+		$(GDOWN) "$(PUBLIC_DATA_FILE_ID)" -O "$$tmp_zip" --quiet; \
+		if [ $$? -ne 0 ] || [ ! -s "$$tmp_zip" ]; then \
+			echo -e "${RED}✗ Failed to download source data. See README > Restoring/Pulling Data on a New Machine.${RESET}"; \
+			rm -f "$$tmp_zip"; \
 			exit 1; \
 		fi; \
-		echo -e "${GREEN}✓ Source data restored from DVC.${RESET}"; \
+		$(PYTHON) -c "import zipfile,sys; zipfile.ZipFile(sys.argv[1]).extractall(sys.argv[2])" "$$tmp_zip" "data"; \
+		if [ $$? -ne 0 ]; then \
+			echo -e "${RED}✗ Failed to extract downloaded source data.${RESET}"; \
+			rm -f "$$tmp_zip"; \
+			exit 1; \
+		fi; \
+		rm -f "$$tmp_zip"; \
+		echo -e "${GREEN}✓ Source data downloaded and extracted.${RESET}"; \
 	else \
 		echo -e "${GREEN}✓ Source data already present.${RESET}"; \
 	fi
 
 .PHONY: pull-data
-pull-data: _ensure-data ## Pull raw source data (CSVs/JSON/images) from DVC if missing locally
+pull-data: _ensure-data ## Download raw source data (CSVs/JSON/images) if missing locally (no login required)
+
+.PHONY: publish-public-data
+publish-public-data: $(VENV)/.installed ## (Maintainer) Refresh the public zero-login data zip from local data/ -- run after `dvc push`
+	@echo -e "${YELLOW}Publishing current data/ raw items to the public download used by \`make up\` on new machines...${RESET}"
+	$(PYTHON) scripts/publish_public_data.py
 
 .PHONY: up
 up: init-env $(VENV)/.installed _ensure-data ## Start all containers in detached mode (pulls data first if missing)
