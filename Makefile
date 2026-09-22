@@ -118,8 +118,34 @@ _wait-ready:
 	echo -e "\n${GREEN}✓ dbt docs are ready at http://localhost:8089${RESET}"
 	@echo ""
 
+.PHONY: _ensure-data
+_ensure-data: $(VENV)/.installed
+	@need_pull=0; \
+	for f in "data/briefing.csv" "data/campaigns_inventory_updated.csv" "data/global_design_data.json"; do \
+		if [ ! -s "$$f" ]; then need_pull=1; fi; \
+	done; \
+	if [ ! -d "data/Creative Assets_" ]; then need_pull=1; fi; \
+	if [ -d "data/Creative Assets_" ]; then \
+		if [ -z "$$(find "data/Creative Assets_" -maxdepth 1 -type f -print -quit 2>/dev/null)" ]; then need_pull=1; fi; \
+	fi; \
+	if [ "$$need_pull" = "1" ]; then \
+		echo -e "${YELLOW}ℹ Raw source data not found locally — pulling from the DVC remote (Google Drive)...${RESET}"; \
+		echo -e "${YELLOW}  First time on this machine? This opens a browser for a one-time Google sign-in.${RESET}"; \
+		$(DVC) pull "data/briefing.csv.dvc" "data/campaigns_inventory_updated.csv.dvc" "data/global_design_data.json.dvc" "data/Creative Assets_.dvc"; \
+		if [ $$? -ne 0 ]; then \
+			echo -e "${RED}✗ Failed to pull source data from DVC. See README > Restoring/Pulling Data on a New Machine.${RESET}"; \
+			exit 1; \
+		fi; \
+		echo -e "${GREEN}✓ Source data restored from DVC.${RESET}"; \
+	else \
+		echo -e "${GREEN}✓ Source data already present.${RESET}"; \
+	fi
+
+.PHONY: pull-data
+pull-data: _ensure-data ## Pull raw source data (CSVs/JSON/images) from DVC if missing locally
+
 .PHONY: up
-up: init-env ## Start all containers in detached mode (builds only if missing)
+up: init-env $(VENV)/.installed _ensure-data ## Start all containers in detached mode (pulls data first if missing)
 	@echo -e "${YELLOW}Starting container fleet (postgres, api, airflow)...${RESET}"
 	$(DOCKER_COMPOSE) up -d
 	@echo -e "${GREEN}✓ Containers launched.${RESET}"
@@ -132,7 +158,7 @@ build: ## Build or rebuild Docker images without starting containers
 	$(DOCKER_COMPOSE) build
 
 .PHONY: up-build
-up-build: init-env ## Force rebuild images, then start containers in detached mode
+up-build: init-env $(VENV)/.installed _ensure-data ## Force rebuild images, then start containers in detached mode
 	@echo -e "${YELLOW}Rebuilding and starting container fleet...${RESET}"
 	$(DOCKER_COMPOSE) up -d --build
 	@echo -e "${GREEN}✓ Containers rebuilt and launched.${RESET}"

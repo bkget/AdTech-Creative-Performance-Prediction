@@ -181,7 +181,8 @@ Usage: make <target>
   setup                Initialize .env and install local dependencies (first-time setup)
   init-env             Create .env from .env.example if not already present
   install              Install/update Python dependencies into the virtual environment
-  up                   Start all containers in detached mode (builds only if missing)
+  pull-data            Pull raw source data (CSVs/JSON/images) from DVC if missing locally
+  up                   Start all containers in detached mode (pulls data first if missing)
   build                Build or rebuild Docker images without starting containers
   up-build             Force rebuild images, then start containers in detached mode
   down                 Stop and remove all containers, networks, and ephemeral state
@@ -396,16 +397,25 @@ make dvc-status
 
 ### Restoring / Pulling Data on a New Machine
 
-The datasets under `data/` are not stored in git — only small `.dvc` pointer files are tracked. The actual data lives in a Google Drive remote (`gdrive_storage`) and is fetched on demand with DVC.
+Only the raw source data is tracked in the DVC remote (Google Drive): `data/briefing.csv`, `data/campaigns_inventory_updated.csv`, `data/global_design_data.json`, and `data/Creative Assets_`. These are not stored in git — only their small `.dvc` pointer files are — so they're fetched on demand with DVC. Everything else under `data/processed/`, `models/`, and `results/` is a *pipeline output*, deliberately **not** stored remotely: it's cheap to regenerate locally with `make dvc-repro` from the raw data above, so there's no need (or safe way, given DVC's lock-file model) to version large, frequently-changing model artifacts in the same remote.
+
+**You normally don't need to do anything by hand.** `make up` automatically checks whether the raw data is present and pulls it first if it's missing, before starting any containers:
 
 ```bash
 git clone <repo-url>
 cd AdTech-Creative-Performance-Prediction
-make setup          # creates .venv and installs dependencies, including dvc[gdrive]
-.venv/bin/dvc pull  # downloads the data referenced by the .dvc files into data/
+make up   # pulls raw data from DVC if missing, then starts the full stack
 ```
 
-The first `dvc pull` (or `dvc push`) on a new machine opens a browser window asking you to sign in with the Google account that has access to the shared Drive folder and approve access. This is a one-time step — the resulting token is cached locally under `~/.cache/pydrive2fs/`, so later `dvc pull` / `dvc push` calls won't prompt again.
+If you just want the data without starting containers, `make pull-data` does the same check-and-pull on its own.
+
+The first pull on a new machine opens a browser window asking you to sign in with the Google account that has access to the shared Drive folder and approve access. This is a one-time step — the resulting token is cached locally under `~/.cache/pydrive2fs/`, so later pulls won't prompt again.
+
+> **Important:** Never run a bare `dvc pull` or `dvc pull --force` with no arguments in this repo. Because `dvc.yaml` declares pipeline outputs (`data/processed/*.parquet`, `models/*.pkl`, etc.) without necessarily having a matching `dvc.lock` yet, an unscoped `dvc pull` will try to reconcile those paths too — and `--force` will delete any local copies it finds without being able to restore them, since they were never pushed to the remote. Always use the scoped form that only touches the four raw-data targets:
+> ```bash
+> .venv/bin/dvc pull "data/briefing.csv.dvc" "data/campaigns_inventory_updated.csv.dvc" "data/global_design_data.json.dvc" "data/Creative Assets_.dvc"
+> ```
+> (`make pull-data` / `make up` already do this safely for you — this is only relevant if you're calling `dvc` directly.) The same applies to `dvc push`: only push these four targets, never a bare `dvc push`, so pipeline outputs never get uploaded by accident.
 
 > **Note:** If Google shows *"This app is blocked"* during that first sign-in, it means DVC's shared default OAuth client has been rate-limited by Google across all of its users — not an error in this project. Fix it by registering your own free OAuth client in [Google Cloud Console](https://console.cloud.google.com/) (APIs & Services → Credentials → **Create OAuth client ID** → Desktop app), then point DVC at it locally:
 > ```bash
