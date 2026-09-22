@@ -115,7 +115,7 @@ class RawVisionFeatures(StagingBase):
     __table_args__ = {"schema": "staging"}
 
     id                   = Column(Integer, primary_key=True, autoincrement=True)
-    image_filename       = Column(String, unique=True, index=True)
+    filename             = Column(String, unique=True, index=True)
     request_id           = Column(String, index=True)
     # Handcrafted features
     aspect_ratio         = Column(Float)
